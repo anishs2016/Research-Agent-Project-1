@@ -2,3 +2,5 @@ anthropic
 tavily-python
 streamlit
 python-dotenv
+yfinance
+pandas

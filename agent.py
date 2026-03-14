@@ -6,19 +6,23 @@ import anthropic
 from tavily import TavilyClient
 from dotenv import load_dotenv
 
-# Load API keys — tries project root .env first, then venv/.env as fallback
+
 load_dotenv()
 load_dotenv("venv/.env", override=False)
 
 MODEL = "claude-sonnet-4-20250514"
 
-SYSTEM_PROMPT = """You are a thorough research assistant. When given a question:
+def get_system_prompt() -> str:
+    from datetime import date
+    today = date.today().strftime("%B %d, %Y")
+    return f"""Today's date is {today}. You are a thorough research assistant. When given a question:
 1. Identify what specific information you need to find
 2. Use the web_search tool to find relevant, up-to-date information
 3. Search multiple times with different queries if needed to get comprehensive coverage
 4. Synthesize a clear, well-structured answer with inline citations
 
-Always cite your sources with URLs. If the first search isn't sufficient, keep searching until you have enough information to give a complete answer."""
+Always cite your sources with URLs. If the first search isn't sufficient, keep searching until you have enough information to give a complete answer.
+Always use the current date in your search queries. Never search for outdated years like 2024 — always search for the most recent content relative to today."""
 
 SEARCH_TOOL = {
     "name": "web_search",
@@ -59,13 +63,14 @@ def _make_tavily_client() -> TavilyClient:
     return TavilyClient(api_key=api_key)
 
 
-def _run_search(query: str) -> str:
-    """Execute a Tavily search and return formatted results."""
+def _run_search(query: str, days: int = 7) -> str:
+    """Execute a Tavily search limited to recent content and return formatted results."""
     try:
         tavily = _make_tavily_client()
         response = tavily.search(
             query=query,
             max_results=5,
+            days=days,
             include_answer=True,
             include_raw_content=False,
         )
@@ -86,14 +91,18 @@ def _run_search(query: str) -> str:
         return f"Search error: {e}"
 
 
-def research_agent(question: str) -> Generator[dict, None, None]:
+MAX_ITERATIONS = 10
+
+
+def research_agent(question: str, days: int = 7) -> Generator[dict, None, None]:
     """
     Multi-step research agent. Loops until it has enough info to answer.
 
     Yields dicts with one of these shapes:
-      {"type": "search",     "query": str}   — agent is about to search
-      {"type": "text_delta", "text":  str}   — streaming answer text chunk
-      {"type": "error",      "message": str} — something went wrong
+      {"type": "search",     "query": str}     — agent is about to search
+      {"type": "text_delta", "text":  str}     — streaming answer text chunk
+      {"type": "warning",    "message": str}   — non-fatal notice (e.g. iteration cap)
+      {"type": "error",      "message": str}   — something went wrong
     """
     try:
         client = _make_anthropic_client()
@@ -102,13 +111,14 @@ def research_agent(question: str) -> Generator[dict, None, None]:
         return
 
     messages: list[dict] = [{"role": "user", "content": question}]
+    finished = False
 
-    for _ in range(10):  # safety cap on iterations
+    for _ in range(MAX_ITERATIONS):
         try:
             with client.messages.stream(
                 model=MODEL,
                 max_tokens=4096,
-                system=SYSTEM_PROMPT,
+                system=get_system_prompt(),
                 tools=[SEARCH_TOOL],
                 messages=messages,
             ) as stream:
@@ -135,9 +145,11 @@ def research_agent(question: str) -> Generator[dict, None, None]:
         messages.append({"role": "assistant", "content": response.content})
 
         if response.stop_reason == "end_turn":
+            finished = True
             break
 
         if response.stop_reason != "tool_use":
+            finished = True
             break
 
         # Execute every tool call Claude requested
@@ -146,7 +158,7 @@ def research_agent(question: str) -> Generator[dict, None, None]:
             if block.type == "tool_use" and block.name == "web_search":
                 query = block.input.get("query", "")
                 yield {"type": "search", "query": query}
-                result = _run_search(query)
+                result = _run_search(query, days=days)
                 tool_results.append(
                     {
                         "type": "tool_result",
@@ -156,6 +168,13 @@ def research_agent(question: str) -> Generator[dict, None, None]:
                 )
 
         if not tool_results:
+            finished = True
             break
 
         messages.append({"role": "user", "content": tool_results})
+
+    if not finished:
+        yield {
+            "type": "warning",
+            "message": f"Reached the {MAX_ITERATIONS}-iteration search limit — the answer may be incomplete. Try re-running.",
+        }

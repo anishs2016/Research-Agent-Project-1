@@ -1,5 +1,17 @@
+# API keys / secrets
 .env
+*.env
+
+# Virtual environment (contains venv/.env with keys)
 venv/
+
+# Python cache
 __pycache__/
-.DS_Store
 *.pyc
+*.pyo
+
+# OS
+.DS_Store
+
+# Editor / tool settings
+.claude/
