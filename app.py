@@ -13,7 +13,7 @@ st.set_page_config(
 tab_research, tab_stocks = st.tabs(["🔍 Research", "📈 Stock Predictor"])
 
 
-# ── Research tab ──────────────────────────────────────────────────────────────
+# Research tab 
 with tab_research:
     st.title("🔍 Research Agent")
     st.caption(
@@ -81,7 +81,7 @@ with tab_research:
                     st.info("The agent finished but produced no text output.")
 
 
-# ── Stock Predictor tab ───────────────────────────────────────────────────────
+# Stock Predictor tab 
 with tab_stocks:
     st.title("📈 Stock Predictor")
     st.caption(
