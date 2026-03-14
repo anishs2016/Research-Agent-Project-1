@@ -5,7 +5,8 @@ An agentic AI research assistant that searches the web and synthesizes cited ans
 Ask any question → the agent breaks it into search queries → fetches live results → streams back a cited answer.
 
 ## Demo
-[add a screenshot or GIF here]
+
+
 
 ## Tech Stack
 - **Claude API** (claude-sonnet) — reasoning & tool calling
