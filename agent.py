@@ -64,7 +64,6 @@ def _make_tavily_client() -> TavilyClient:
 
 
 def _run_search(query: str, days: int = 7) -> str:
-    """Execute a Tavily search limited to recent content and return formatted results."""
     try:
         tavily = _make_tavily_client()
         response = tavily.search(
@@ -95,15 +94,6 @@ MAX_ITERATIONS = 10
 
 
 def research_agent(question: str, days: int = 7) -> Generator[dict, None, None]:
-    """
-    Multi-step research agent. Loops until it has enough info to answer.
-
-    Yields dicts with one of these shapes:
-      {"type": "search",     "query": str}     — agent is about to search
-      {"type": "text_delta", "text":  str}     — streaming answer text chunk
-      {"type": "warning",    "message": str}   — non-fatal notice (e.g. iteration cap)
-      {"type": "error",      "message": str}   — something went wrong
-    """
     try:
         client = _make_anthropic_client()
     except ValueError as e:
@@ -122,7 +112,6 @@ def research_agent(question: str, days: int = 7) -> Generator[dict, None, None]:
                 tools=[SEARCH_TOOL],
                 messages=messages,
             ) as stream:
-                # Stream any text Claude emits in this turn
                 for text in stream.text_stream:
                     yield {"type": "text_delta", "text": text}
 
@@ -141,7 +130,6 @@ def research_agent(question: str, days: int = 7) -> Generator[dict, None, None]:
             yield {"type": "error", "message": f"Anthropic API error ({e.status_code}): {e.message}"}
             return
 
-        # Append the full assistant turn (preserves tool_use blocks)
         messages.append({"role": "assistant", "content": response.content})
 
         if response.stop_reason == "end_turn":
@@ -152,7 +140,6 @@ def research_agent(question: str, days: int = 7) -> Generator[dict, None, None]:
             finished = True
             break
 
-        # Execute every tool call Claude requested
         tool_results = []
         for block in response.content:
             if block.type == "tool_use" and block.name == "web_search":

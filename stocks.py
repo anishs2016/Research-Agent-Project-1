@@ -12,7 +12,7 @@ load_dotenv("venv/.env", override=False)
 
 MODEL = "claude-sonnet-4-20250514"
 
-# Base system prompt — recent price data is appended dynamically per call
+
 def _get_system_base() -> str:
     from datetime import date
     today = date.today().strftime("%B %d, %Y")
@@ -55,16 +55,6 @@ Base this range on the current price, recent trend, and news sentiment.
 
 
 def _fetch_price_data(ticker: str) -> dict:
-    """
-    Fetch the last 90 days of price history via yfinance.
-
-    Returns a dict with:
-      current_price    float
-      change_5d_pct    float
-      hist_30d         dict[str, float]  — date string → close price (for UI chart)
-      price_context    str               — formatted last-10-day block for LLM
-    On failure, returns {"error": str}.
-    """
     try:
         hist = yf.Ticker(ticker).history(period="90d")
         if hist.empty:
@@ -97,18 +87,6 @@ def _fetch_price_data(ticker: str) -> dict:
 
 
 def stocks_agent(ticker: str, company: str, days: int = 7) -> Generator[dict, None, None]:
-    """
-    Research and predict stock performance from recent news + real price data.
-
-    Yields dicts:
-      {"type": "price_data",  "current_price": float, "change_5d_pct": float,
-                               "hist_30d": dict[str, float], "ticker": str}
-      {"type": "search",      "query": str}
-      {"type": "text_delta",  "text": str}
-      {"type": "warning",     "message": str}
-      {"type": "error",       "message": str}
-    """
-    # ── 1. Fetch price data before touching the LLM ───────────────────────────
     price_data = _fetch_price_data(ticker)
 
     if "error" in price_data:
@@ -130,10 +108,8 @@ def stocks_agent(ticker: str, company: str, days: int = 7) -> Generator[dict, No
             f"{abs(price_data['change_5d_pct']):.2f}% vs 5 days ago)"
         )
 
-    # ── 2. Build system prompt with price context ─────────────────────────────
     system = _get_system_base() + price_section
 
-    # ── 3. Run agentic loop ───────────────────────────────────────────────────
     try:
         client = _make_anthropic_client()
     except ValueError as e:

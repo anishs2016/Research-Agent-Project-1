@@ -13,7 +13,6 @@ st.set_page_config(
 tab_research, tab_stocks = st.tabs(["🔍 Research", "📈 Stock Predictor"])
 
 
-# Research tab 
 with tab_research:
     st.title("🔍 Research Agent")
     st.caption(
@@ -81,7 +80,6 @@ with tab_research:
                     st.info("The agent finished but produced no text output.")
 
 
-# Stock Predictor tab 
 with tab_stocks:
     st.title("📈 Stock Predictor")
     st.caption(
@@ -110,7 +108,6 @@ with tab_stocks:
         if not ticker or not company:
             st.warning("Please enter both a ticker symbol and a company name.")
         else:
-            # Placeholders set up before the loop so layout order is guaranteed
             metrics_placeholder = st.empty()
             chart_placeholder = st.empty()
 
@@ -139,9 +136,7 @@ with tab_stocks:
                                       delta=f"{change:+.2f}%",
                                       delta_color="normal")
 
-                        df = pd.DataFrame(
-                            {"Close ($)": event["hist_30d"]}
-                        )
+                        df = pd.DataFrame({"Close ($)": event["hist_30d"]})
                         chart_placeholder.line_chart(df, use_container_width=True)
 
                     case "search":
@@ -161,7 +156,6 @@ with tab_stocks:
                         break
 
             if not had_error:
-                # Render verdict banner once after streaming is complete
                 upper = full_text.upper()
                 if "BULLISH" in upper:
                     verdict_placeholder.success("Verdict: **BULLISH 📈**")
